@@ -1,15 +1,13 @@
 #ifndef MYPING_H
 #define MYPING_H
 
-#include <boost/asio/connect.hpp>
 #include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/ip/icmp.hpp>
-#include <boost/asio/buffer.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/asio/deadline_timer.hpp>
 
 #include <iostream>
-
-#include <icmppacket.h>
 #include <icmpechorequest.h>
 
 using namespace boost::asio;
@@ -17,16 +15,19 @@ using namespace boost::asio;
 class myPing
 {
 public:
-    myPing(boost::mutex *consoleMutex): consoleMutex(consoleMutex){
-        io_service = new boost::asio::io_service();
+    myPing(): socket(my_io_service, ip::icmp::v4()){
+
     }
-
     bool startEcho(const char* ip);
-
 private:
-    boost::asio::io_service *io_service;
-    boost::mutex *consoleMutex;
 
+    io_service my_io_service;
+    boost::mutex *socketMutex;
+    ip::icmp::socket socket;
+    ip::icmp::endpoint ep;
+
+    void sendRequest(const char* ip);
+    bool recieveReply();
 };
 
 #endif // MYPING_H

@@ -1,21 +1,22 @@
 #ifndef ICMPECHOREQUEST_H
 #define ICMPECHOREQUEST_H
 
-#include "icmppacket.h"
+#include <boost/asio.hpp>
 
-#include <boost/array.hpp>
-#include <boost/any.hpp>
+#include <iostream>
 
-class icmpEchoRequest : public icmpPacket
+class icmpEchoRequest
 {
 public:
-    icmpEchoRequest();
-    void getPacket(boost::asio::mutable_buffer &buff);
-    ~icmpEchoRequest(){};
+    icmpEchoRequest(){}
+    unsigned char* getPacket();
+    // set sequence number
+    // set id
+    // set data
+    ~icmpEchoRequest(){}
 private:
     void setPacket();
-    boost::array<boost::any, 6> packet;
-
+    unsigned char packet[9];
 };
 
 #endif // ICMPECHOREQUEST_H

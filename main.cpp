@@ -1,6 +1,6 @@
 #include <QCoreApplication>
 
-#include "icmppacket.h"
+#include "icmpechorequest.h"
 #include "myping.h"
 
 #include <boost/thread.hpp>
@@ -11,10 +11,10 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    boost::mutex consoleMutex;
-    myPing ping(&consoleMutex);
+    const char ip[] = "localhost";
 
-    ping.startEcho("localhost");
+    myPing ping;
+    ping.startEcho(ip);
 
-    return 0;
+    return 1;
 }
