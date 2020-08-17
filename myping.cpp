@@ -1,26 +1,43 @@
 #include "myping.h"
 
-bool myPing::startEcho(const char* ip){
+bool myPing::startEcho(const char* destIp){
 
-    // send
+    ip = destIp;
 
-    sendRequest(ip);
+    int requestNum = 5; // Число попыток, которые мы предпример в качестве отсутствия ответа
+    boost::posix_time::seconds replyTime = boost::posix_time::seconds(2); // Время на ответ
 
-    // wait 3 seconds
+    for(int i = 0; i < requestNum && !numOfReplies; i++){
 
-    boost::asio::io_context context;
-    boost::asio::deadline_timer timer(context);
-    timer.expires_from_now(boost::posix_time::seconds(3));
-    //timer.wait();
+        std::cout << "Sending " << i + 1 << " packet to " << ip << std::endl;
+        sendRequest();
 
-    // recieve
+        boost::thread receiveThread(&myPing::receiveReply, this);
+        boost::thread timerThread(&myPing::waitForReply, this, replyTime);
 
-    if(recieveReply())
+        receiveThread.join();
+        timerThread.join();
+    }
+
+    if(numOfReplies)
         return true;
     return false;
 }
 
-void myPing::sendRequest(const char* ip){
+void myPing::waitForReply(boost::posix_time::seconds replyTime){
+    boost::asio::io_context context;
+    boost::asio::deadline_timer timer(context);
+
+    timer.expires_from_now(replyTime);
+    timer.wait();
+
+    if(numOfReplies == 0){
+        std::cout << "Request timeout\n";
+        socket.cancel();
+    }
+}
+
+void myPing::sendRequest(){
 
     ip::icmp::resolver resolver(my_io_service);
     ep = *resolver.resolve(ip::icmp::v4(), ip, "");
@@ -32,16 +49,25 @@ void myPing::sendRequest(const char* ip){
     std::ostream os(&requestBuffer);
     os.write(reinterpret_cast<const char*>(packet), 9);
 
-    std::cout << "Pinging " << ip << std::endl;
     socket.send_to(requestBuffer.data(), ep);
 }
 
-bool myPing::recieveReply(){
+void myPing::handleReceive(){
+    if(replyBuffer.size())
+        numOfReplies++;
+}
 
-    boost::asio::streambuf replyBuffer;
+void myPing::receiveReply(){
 
-    std::size_t recSize = socket.receive_from(replyBuffer.prepare(static_cast<std::size_t>(1024)), ep);
-    std::cout << "Recieved " << recSize << " butes\n";
+    socket.async_receive(replyBuffer.prepare(1024),
+                         boost::bind(&myPing::handleReceive, this));
+
+    /*
+    std::size_t recSize = socket.receive_from(replyBuffer.prepare(static_cast<std::size_t>(1024)), ep, 0, error);
+    if(error && error != boost::asio::error::message_size)
+        return 0;
+
+    std::cout << "Recieved " << recSize << " bytes\n";
 
     if(recSize == 0){
         std::cout << "No reply\n";
@@ -52,7 +78,7 @@ bool myPing::recieveReply(){
         std::istream is(&replyBuffer);
         is.read(reinterpret_cast<char*>(output), recSize);
 
-        std::cout << "Recieved\n";
+        std::cout << "Data:\n";
 
         for(int i = 0; i < recSize; i++)
             std::cout << i << ": " << (int)output[i] << "\n";
@@ -61,4 +87,5 @@ bool myPing::recieveReply(){
                   << std::endl;
         return 1;
     }
+    */
 }

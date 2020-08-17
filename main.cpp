@@ -14,7 +14,9 @@ int main(int argc, char *argv[])
     const char ip[] = "localhost";
 
     myPing ping;
-    ping.startEcho(ip);
+    if(ping.startEcho(ip))
+        std::cout << ip << " replied" << std::endl;
 
+    std::cin.get();
     return 1;
 }

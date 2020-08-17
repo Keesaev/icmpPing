@@ -17,7 +17,6 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
     myping.cpp \
-    icmppacket.cpp \
     icmpechorequest.cpp
 
 INCLUDEPATH += /usr/include/boost
@@ -31,5 +30,4 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 HEADERS += \
     myping.h \
-    icmppacket.h \
     icmpechorequest.h
