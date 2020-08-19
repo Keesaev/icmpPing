@@ -7,7 +7,6 @@
 #include <boost/thread.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/bind.hpp>
-#include <boost/smart_ptr/shared_ptr.hpp>
 
 #include <iostream>
 #include <icmpechorequest.h>
@@ -21,19 +20,20 @@ public:
 
     }
     ~myPing(){
-
+        socket.close();
     }
     bool startEcho(const char* destIp);
 private:
 
     io_service my_io_service;
-    boost::mutex *socketMutex;
+    boost::mutex consoleMutex;
     ip::icmp::socket socket;
     ip::icmp::endpoint ep;
+    boost::asio::deadline_timer *timerPtr;
     const char *ip;
     int numOfReplies;
 
-    void handleReceive();
+    void handleReceive(const boost::system::error_code& error, std::size_t bytes_transfered);
     void waitForReply(boost::posix_time::seconds replyTime);
     void sendRequest();
     void receiveReply();

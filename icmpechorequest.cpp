@@ -18,8 +18,8 @@ void icmpEchoRequest::setPacket(){
 
     packet[1] = 0x0;
 
-    packet[2] = 0x0;
-    packet[3] = 0x9;
+    packet[2] = 0x7C;
+    packet[3] = 0xFA;
 
     packet[4] = 0x0;
     packet[5] = 0x5;
