@@ -10,9 +10,6 @@ class icmpEchoRequest
 public:
     icmpEchoRequest(){}
     unsigned char* getPacket();
-    // set sequence number
-    // set id
-    // set data
     ~icmpEchoRequest(){}
 private:
     void setPacket();

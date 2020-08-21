@@ -1,55 +1,65 @@
 #include "myping.h"
 
-bool myPing::startEcho(const char* destIp){
+/*      TODO
 
-    ip = destIp;
+    - expand handleReceive method with proper reply decoding
+    - add incorrect address handling for resolver
 
-    int requestNum = 3; // Число попыток, которые мы предпример в качестве отсутствия ответа
-    boost::posix_time::seconds replyTime = boost::posix_time::seconds(5); // Время на ответ
+*/
 
-    for(int i = 0; i < requestNum && !numOfReplies; i++){
+void myPing::startEcho(){
 
-        ip::icmp::resolver resolver(my_io_service);
-        ep = *resolver.resolve(ip::icmp::v4(), ip, "");
+    ip::icmp::resolver resolver(my_io_service);
+    ep = *resolver.resolve(ip::icmp::v4(), ip, "");
 
-        std::cout << "Sending " << i + 1 << " packet to " << ip << std::endl;
-        sendRequest();
-
-        boost::thread receiveThread(&myPing::receiveReply, this);
-        boost::thread timerThread(&myPing::waitForReply, this, replyTime);
-
-        my_io_service.run();
+    for(int requestNum = 0; requestNum < maxRequestNum; requestNum++){
         my_io_service.reset();
+        replyFlag = false;
 
-        receiveThread.join();
+        start = boost::chrono::system_clock::now();
+
+        // ConsoleMutex is used for std::iostream synchronization
+        consoleMutex.lock();
+        std::cout << "Sending " << requestNum + 1 << " packet to " << ip << std::endl;
+        // Request is sent synchronously
+        sendRequest();
+        consoleMutex.unlock();
+
+        // Timer drops socket after reply time is up
+        // If reading from socket is successfull we cancel the timer
+        boost::thread timerThread(&myPing::waitForReply, this);
+
+        receiveReply();
+        my_io_service.run();
         timerThread.join();
     }
-
-    if(numOfReplies)
-        return true;
-    return false;
 }
 
-void myPing::waitForReply(boost::posix_time::seconds replyTime){
+void myPing::waitForReply(){
     boost::asio::io_context context;
     boost::asio::deadline_timer timer(context);
-    timerPtr = &timer;
+    timerPtr = &timer; // Storing pointer to cancel timer from other thread
 
     timer.expires_from_now(replyTime);
-    timer.wait();
-
+    timer.async_wait(boost::bind(&myPing::handleTimeout, this,
+                                 boost::asio::placeholders::error));
     context.run();
+}
 
-    if(numOfReplies == 0){
-        //consoleMutex.lock();
+void myPing::handleTimeout(const boost::system::error_code& error){
+    // Checking for operation_aborted error because we expect it to be canceled
+    if(error == boost::asio::error::operation_aborted)
+        return;
+    if(!replyFlag){
+        consoleMutex.lock();
         std::cout << "Request timeout\n";
         consoleMutex.unlock();
-        //socket.cancel();
+        // Reading from socket will never stop if socket is empty so we have to stop it
+        socket.cancel();
     }
 }
 
 void myPing::sendRequest(){
-
     icmpEchoRequest echoRequest;
     unsigned char *packet = echoRequest.getPacket();
 
@@ -61,22 +71,37 @@ void myPing::sendRequest(){
 }
 
 void myPing::handleReceive(const boost::system::error_code& error, std::size_t bytes_transfered){
-
     if(!error){
-
         if(bytes_transfered){
-            //consoleMutex.lock();
-            std::cout << "Received " << bytes_transfered << " bytes\n";
+            consoleMutex.lock();
+            boost::chrono::duration<double> elapsedTime = boost::chrono::system_clock::now() - start;
+            std::cout << "Received a reply after " << elapsedTime.count() << " sec" << std::endl;
+
+            // Not checking the reply for id and seq number YET
+            // Just assuming that any reply from that ip is an echo reply
+
+            /*
+            unsigned char* output = new unsigned char[bytes_transfered];
+                    std::istream is(&replyBuffer);
+                    is.read(reinterpret_cast<char*>(output), static_cast<std::streamsize>(bytes_transfered));
+
+                    std::cout << "Recieved\n";
+
+                    for(int i = 0; i < static_cast<std::streamsize>(bytes_transfered); i++)
+                        std::cout << i << ": " << static_cast<int>(output[i]) << "\n";
+            */
             numOfReplies++;
+            replyFlag = true;
+
             timerPtr->cancel();
-            //consoleMutex.unlock();
+            consoleMutex.unlock();
         }
     }
 }
 
 void myPing::receiveReply(){
-
-    socket.async_receive(replyBuffer.prepare(64),
+    // Receiving 64KB
+    socket.async_receive_from(replyBuffer.prepare(65536), ep,
                          boost::bind(&myPing::handleReceive, this,
                                      boost::asio::placeholders::error,
                                      boost::asio::placeholders::bytes_transferred));
